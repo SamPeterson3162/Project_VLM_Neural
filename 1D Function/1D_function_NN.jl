@@ -29,6 +29,7 @@ function train(true_func)
     # Set up the optimization
     max_iterations = 4000
     current_iteration = 0
+    # Iterations will stop when the target loss is achieved.
     target_loss = .05
     losses = ones(max_iterations).*target_loss
     current_loss = 1
@@ -58,19 +59,21 @@ function train(true_func)
     losses = losses[1:current_iteration]
     loss_range = collect(range(1, current_iteration))
     #region Plotting
+    # Plot training points with the true function and the predicted values from the model
     x_plot = reshape(collect(range(-10.0f0, 10.0f0, length=100)), 1, 100)
     y_pred, _ = Lux.apply(model, x_plot, ps, st)
     plot(vec(x_train), vec(y_train), seriestype=:scatter, label="Training Data",
-        title="NN Learning Linear Function")
+        title="NN Learning Linear Function", color=:white)
     plot!(vec(x_plot), vec(y_pred), label="NN Prediction (Learned)", linewidth=3, linestyle=:dash, color=:blue)
-    plot!(vec(x_plot), true_func.(vec(x_plot)), label="True Function")
+    plot!(vec(x_plot), true_func.(vec(x_plot)), label="True Function", linewidth=1, color=:red)
     xlabel!("x")
     ylabel!("y")
     savefig("nn_linear_regression_plot.png")
+    # Plot the loss over time
     println("Plot saved as nn_linear_regression_plot.png")
     plot(loss_range, losses, title="Loss Over Time",label = "",y_scale=:log10)
     savefig("loss_over_time.png")
-
+    # Plot outer range to show how the model is inaccurate outside the range.
     x_plot = reshape(collect(range(-20.0f0, 20.0f0, length=100)), 1, 100)
     plot(vec(x_plot), true_func.(vec(x_plot)), label="True Function")
     y_pred, _ = Lux.apply(model, x_plot, ps, st)
