@@ -130,7 +130,7 @@ function train()
     end
     loss_plt = plot(1:epochs,train_losses,label="Training Set Loss",title="Loss over time",y_scale=:log10)
     plot!(1:epochs,test_losses,label="Testing Set Loss")
-    savefig(loss_plt, "MPG_Loss_Function.png")
+    savefig(loss_plt, "auto+mpg/MPG_Loss_Function.png")
     final_vars = test_vars[:,1]
     final_mpg = test_mpg[1,1]
 
