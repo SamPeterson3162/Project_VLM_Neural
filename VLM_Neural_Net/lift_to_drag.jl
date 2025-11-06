@@ -1,8 +1,7 @@
 using VortexLattice # load package we will be using
 using DelimitedFiles
 
-# outliers function to get rid of outliers in the lift/drag plot. The discontinuity made the plot meaningless
-# Also could have just defined the ranges of the plot and cropped out those points anyways.
+# This file writes our vlm_data file that will be used to train the neural network
 
 
 function analyze_system(x1, x2, x3, x4)

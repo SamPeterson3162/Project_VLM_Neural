@@ -8,6 +8,8 @@ using Statistics
 using MLUtils
 using VortexLattice
 
+# This file trains a neural network with the chord values and CL/CDiff values given by lift_to_drag.jl and then
+# Lets us compute the value using the neural net for any distribution of chord lengths and gives the true value
 
 function analyze_system(x1, x2, x3, x4)
     # This is the same function used to create the file, but here it is just used to test the final value input by the user
