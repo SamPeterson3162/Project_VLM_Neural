@@ -8,8 +8,8 @@ using Statistics
 using MLUtils
 using VortexLattice
 
-# This file trains a neural network with the chord values and CL/CDiff values given by lift_to_drag.jl and then
-# Lets us compute the value using the neural net for any distribution of chord lengths and gives the true value
+#= This file trains a neural network with the angle of attack and chord values to predict  CL and CD values given by lift_to_drag_alpha.jl and then
+lets us compute the value using the neural net for any distribution of chord lengths and gives the true value=#
 
 function analyze_system(a,root,x1, x2, x3, x4)
     # This is the same function used to create the file, but here it is just used to test the final value input by the user
@@ -59,30 +59,31 @@ function analyze_system(a,root,x1, x2, x3, x4)
     return CL, CDiff
 end
 
-function get_data(file)
-    println("Reading File")
+function get_data(file) # Reads, processes, and splits our data from the vlm file into sets for training and testing
+    println("Reading File") # Read data from our vlm file
     lines = readlines(file)
     num_lines = length(lines)
     vlm_data = zeros(8, num_lines)
-    for i in 1:num_lines
+    for i in 1:num_lines #Split the data up into 8 columns within a matrix
         line = split(lines[i])
         for j in 1:8
             vlm_data[j,i] = parse(Float32,line[j])
         end
     end
+    # vlm_data is ordered with CL, CD, Alpha, Root, x1, x2, x3, x4
     # Define test and trainining sets
     println("Defining vectors of data")
-    ratio = 0.8
+    ratio = 0.8 # We want 80 percent of our data set used for training, the rest for testing
     train_size = round(Int, num_lines * ratio)
     test_size = num_lines - train_size
-    training_vars = zeros(6,train_size)
+    training_vars = zeros(6,train_size) # Create zero lists for training and testing data sets
     training_vlm = zeros(2,train_size)
     test_vars = zeros(6,test_size)
     test_vlm = zeros(2,test_size)
     # Normalize Data
     println("Normalizing the data")
-    vlm_norm = zeros(8, 2)
-    for i in 1:8
+    vlm_norm = zeros(8, 2) # 1-8 for each variable within the data, 1-2 for mean and standard deviation respectively
+    for i in 1:8 # Iterates through each variable and adds mean and standard deviation to vlm_norm matrix
         c_mean = mean(vlm_data[i,:])
         c_std = std(vlm_data[i,:])
         vlm_data[i,:] .= (vlm_data[i,:].-c_mean)./c_std
@@ -92,30 +93,29 @@ function get_data(file)
     end
     # Split vlm_data using the 80/20 split for training and testing
     println("Defining training and testing sets")
-    indices = shuffle!(collect(1:num_lines))
+    indices = shuffle!(collect(1:num_lines)) # Randomizes order of indices
     train_ind = indices[1:train_size]
     test_ind = indices[train_size+1:end]
     for i in 1:train_size
-        training_vlm[1:2,i] = vlm_data[1:2,train_ind[i]]
+        training_vlm[1:2,i] = vlm_data[1:2,train_ind[i]] # adds values from selected indices to training set outputs
         for j in 3:8
-            training_vars[j-2,i] = vlm_data[j,train_ind[i]]
+            training_vars[j-2,i] = vlm_data[j,train_ind[i]] # adds values from selected indices to training set inputs
         end
     end
     for i in 1:num_lines - train_size
-        test_vlm[1:2,i] = vlm_data[1:2,test_ind[i]]
+        test_vlm[1:2,i] = vlm_data[1:2,test_ind[i]] # adds values from selected indices to testing set outputs
         for j in 3:8
-            test_vars[j-2,i] = vlm_data[j,test_ind[i]]
+            test_vars[j-2,i] = vlm_data[j,test_ind[i]] # adds values from selected indices to testing set inputs
         end
     end
     return training_vars, training_vlm, test_vars, test_vlm, vlm_norm
 end
 
 function train()
-    # Extract data from auto-vlm.data file
+    # Extract data from vlm_alpha_data_file
     training_vars, training_vlm, test_vars, test_vlm, vlm_norm = get_data("vlm_neural_net/vlm_alpha_data_file.data")
-    # Define our model
+    #region Model Definition
     println("Defining Model")
-    num_samples = size(training_vars,2)
     model = Lux.Chain(
         Lux.Dense(6 => 30,relu),
         Lux.Dense(30 => 30,relu),
@@ -126,51 +126,56 @@ function train()
     )
     rng = Random.default_rng()
     ps, st = Lux.setup(rng, model)
-    epochs = 5000
-    train_losses = ones(epochs)
+    epochs = 5000 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< DEFINE EPOCHS HERE
+    # __________________________________________________________________________________________________________
+    train_losses = ones(epochs) # Create local lists for training and testing losses
     test_losses = ones(epochs)
     cl_losses = ones(epochs)
     cd_losses = ones(epochs)
+    #endregion
+    #region Loss Functions
     # Define loss function using Mean Squared
     println("Defining loss function")
-    function loss(model, ps, st, x, y)
+    function loss(model, ps, st, x, y) #= Loss function that deals with both CL and CD, returning losses for each as well as the combined
+        loss used for optimization in our model=#
         true_y, new_state = model(x, ps, st)
-        CL_pred = true_y[1,:]
-        CD_pred = true_y[2,:]
-        l_CL = sum((CL_pred.-y[1,:]).^2)/size(y, 2)
+        CL_pred = true_y[1,:] # Get just CL values
+        CD_pred = true_y[2,:] # Get just CD values
+        l_CL = sum((CL_pred.-y[1,:]).^2)/size(y, 2) # Compute Mean Standard Error for each seperately
         l_CD = sum((CD_pred.-y[2,:]).^2)/size(y, 2)
-        l = l_CL + l_CD
+        l = l_CL + l_CD # Adds Errors together, values here are still normalized
         return l, l_CL, l_CD, new_state
     end
     function abs_loss(model, ps, st, x, y)
         true_y, new_state = model(x, ps, st)
-        # Denormalize
+        # Denormalize our values for CL and CD to provide true errors
         true_y2 = zeros(size(true_y))
         y2 = zeros(size(y))
         print(size(y))
         print(size(true_y))
-        true_y2[1, :] .= true_y[1,:].*vlm_norm[1,2] .+vlm_norm[1,1]
-        true_y2[2, :] .= true_y[2,:].*vlm_norm[2,2] .+vlm_norm[2,1]
-        y2[1,:] .= y[1,:].*vlm_norm[1,2] .+vlm_norm[1,1]
-        y2[2,:] .= y[2,:].*vlm_norm[2,2] .+vlm_norm[2,1]
-        l_cl = sum(abs.(true_y2[1,:].-y2[1,:]))/size(y, 2)
-        l_cd = sum(abs.(true_y2[2,:].-y2[2,:]))/size(y, 2)
-
+        true_y2[1, :] .= true_y[1,:].*vlm_norm[1,2] .+vlm_norm[1,1] # predicted CL Values being denormalized
+        true_y2[2, :] .= true_y[2,:].*vlm_norm[2,2] .+vlm_norm[2,1] # predicted CD Values being denormalized
+        y2[1,:] .= y[1,:].*vlm_norm[1,2] .+vlm_norm[1,1] # Actual CL values being denormalized
+        y2[2,:] .= y[2,:].*vlm_norm[2,2] .+vlm_norm[2,1] # Actual CD values being denormalized
+        l_cl = sum(abs.(true_y2[1,:].-y2[1,:]))/size(y, 2) # Compute MSE for CL
+        l_cd = sum(abs.(true_y2[2,:].-y2[2,:]))/size(y, 2) # Compute MSE for CD
         return l_cl, l_cd, new_state
     end
-    optimizer = Optimisers.ADAMW(0.0011f0, (0.9f0, 0.999f0), 0.1f0)
-    opt_state = Optimisers.setup(optimizer, ps)
+    #endregion
+    #region Optimization
+    optimizer = Optimisers.ADAMW(0.0011f0, (0.9f0, 0.999f0), 0.1f0) # Using ADAMW as decay helps increase generalization and reduce test loss
+    opt_state = Optimisers.setup(optimizer, ps) # Set states
     # Run iterations with epochs
     println("Training in progress...")
-    batch_size = 64
-    loss_val = 1
-    cl_loss = 1
-    cd_loss = 1
-    loader = DataLoader((training_vars, training_vlm), batchsize=batch_size, shuffle=true)
-    final_cl_error, final_cd_error = 0, 0
+    batch_size = 64 # <<<<<<<<<<<<<<<<<<<<<<<<<< BATCH SIZE HERE
+    loss_val = 1 
+    cl_loss = 1 # create local loss values to update in for loop
+    cd_loss = 1 # '                                             '
+    final_cl_error, final_cd_error = 0, 0 # '                   '
+    loader = DataLoader((training_vars, training_vlm), batchsize=batch_size, shuffle=true) # Set up batch loading
     for epoch in 1:epochs # Iterates through epochs iterations
-        local epoch_loss = 0.0
-        local num_batches = 0
+        local epoch_loss = 0.0 # Defines loss of this epoch iteration
+        local num_batches = 0 
         for (x_batch, y_batch) in loader
             (loss_val, cl_loss, cd_loss, updated_state), grads = Zygote.withgradient(
                 p -> loss(model, p, st, x_batch, y_batch), # Use the batch
@@ -178,37 +183,40 @@ function train()
             )
 
             opt_state, ps = Optimisers.update(opt_state, ps, grads[1])
-            st = updated_state
+            st = updated_state # Update state and other variables
             epoch_loss += loss_val
             num_batches += 1
         end
         current_loss = loss_val
         #train_losses[epoch] = current_loss
-        train_losses[epoch] = epoch_loss / num_batches
-        test_loss_val, _ = loss(model, ps, st, test_vars, test_vlm)
-        test_losses[epoch] = test_loss_val
-        cl_losses[epoch] = cl_loss
-        cd_losses[epoch] = cd_loss
+        train_losses[epoch] = epoch_loss / num_batches # Used for plotting
+        test_loss_val, _ = loss(model, ps, st, test_vars, test_vlm) 
+        test_losses[epoch] = test_loss_val # Used for plotting loss, also printed after every 100 epochs
+        cl_losses[epoch] = cl_loss # Used for plotting loss
+        cd_losses[epoch] = cd_loss # Used for plotting loss
         if epoch == epochs
-            final_cl_error, final_cd_error, _ = abs_loss(model, ps, st, test_vars, test_vlm)
+            final_cl_error, final_cd_error, _ = abs_loss(model, ps, st, test_vars, test_vlm) # Save final absolute errors for cl and cd
         end
         if epoch % 100 == 0
-            println("\ncurrent test loss: $test_loss_val")
+            println("\ncurrent test loss: $test_loss_val") # Print test loss every 100 epochs
         end
     end
+    #endregion
+    #region Loss Plotting
     loss_plt = plot(1:epochs,train_losses,label="Training Set Loss",title="Loss over time",y_scale=:log10)
     plot!(1:epochs,test_losses,label="Testing Set Loss")
     plot!(1:epochs,cl_losses,label="Lift Loss")
     plot!(1:epochs,cd_losses,label="Drag Loss")
     savefig(loss_plt, "vlm_neural_net/vlm_Loss_Function.png")
-
+    #endregion
     return model, ps, st, vlm_norm, final_cl_error, final_cd_error
 end
 
 function main()
-    model, ps, st, vlm_norm, cl_error, cd_error = train()
+    model, ps, st, vlm_norm, cl_error, cd_error = train() # run train function to train the neural network
     println("Test Set CL Average Absolute Error: $cl_error")
     println("Test Set CD Average Absolute Error: $cd_error")
+    #region User Testing Values
     # Apply the model to a random line of data
     prediction(x) = Lux.apply(model, x, ps, st)
     test_vals = zeros(6,1)
@@ -254,6 +262,7 @@ function main()
         println("Case CD error:                      $(abs(CD-CDiff))")
         println("Test Set CD Average Absolute Error: $cd_error")
     end
+    #endregion
 end
 
 
