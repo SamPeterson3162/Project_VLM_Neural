@@ -65,10 +65,10 @@ function main()
     input_lst = zeros(8,n)
     for i in 1:n
         x_root = 1
-        x1 = x_root * rand(40:100)/100
-        x2 = x1 * rand(20:100)/100
-        x3 = x2 * rand(10:100)/100
-        x4 = x3 * rand(5:100)/100
+        x1 = x_root * rand(75:100)/100
+        x2 = rand(50:x1*100)/100
+        x3 = rand(25:x2*100)/100
+        x4 = rand(10:x3*100)/100
         input_lst[4:8,i] .= x_root, x1, x2, x3, x4
         input_lst[3,i] = rand(1:100)/10
     end
