@@ -9,7 +9,7 @@ function get_area(x1, x2, x3, x4)
     return area*2.5
 end
 
-function analyze_system(x1, x2, x3, x4)
+function analyze_system(a,x1, x2, x3, x4)
     #Set up the geometric properties of half the wing'
     total_area = 20
     yle = [0.0, 2.5, 5, 7.5, 10] # leading edge y-position
@@ -42,7 +42,7 @@ function analyze_system(x1, x2, x3, x4)
     # freestream definition
     # Insert range for angle in degrees below
     # Iterate through the different angles of attack, one degree at a time
-    alpha = 5*pi/180 # angle of attack, where i is degrees but the program uses radians.
+    alpha = a*pi/180 # angle of attack, where i is degrees but the program uses radians.
     beta = 0.0 # sideslip angle
     Omega = [0.0, 0.0, 0.0] # rotational velocity around the reference location
     fs = Freestream(Vinf, alpha, beta, Omega)
@@ -62,22 +62,23 @@ end
 function main()
     n = 500
     # Define function to get chords
-    input_lst = zeros(6,n)
-    input_lst[2:6,1] .= 1, .9375,.75, .4375, .01
-    for i in 2:n
+    input_lst = zeros(8,n)
+    for i in 1:n
         x_root = 1
         x1 = x_root * rand(40:100)/100
         x2 = x1 * rand(20:100)/100
         x3 = x2 * rand(10:100)/100
         x4 = x3 * rand(5:100)/100
-        input_lst[2:6,i] .= x_root, x1, x2, x3, x4
+        input_lst[4:8,i] .= x_root, x1, x2, x3, x4
+        input_lst[3,i] = rand(1:100)/10
     end
     for i in 1:n
-        x1, x2, x3, x4 = input_lst[3:6,i]
-        CL, CDiff, root = analyze_system(x1, x2, x3, x4)
-        input_lst[:,i] .= input_lst[:,i] .* root
-        input_lst[1,i] = CL/CDiff
-        input_lst[2,i] = root
+        a = input_lst[3,i]
+        x1, x2, x3, x4 = input_lst[5:8,i]
+        CL, CDiff, root = analyze_system(a, x1, x2, x3, x4)
+        input_lst[4:8,i] .= input_lst[4:8,i] .* root
+        input_lst[1:2,i] .= CL, CDiff
+        input_lst[4,i] = root
     end
     # Write to file
     output_file = "vlm_neural_net/vlm_data_file.data"
