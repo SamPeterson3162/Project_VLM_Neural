@@ -81,7 +81,7 @@ function main()
         input_lst[4,i] = root
     end
     # Write to file
-    output_file = "vlm_neural_net/vlm_data_file.data"
+    output_file = "vlm_neural_net/vlm_alpha_data_file.data"
     delimiter = ' ' 
     writedlm(output_file, transpose(input_lst), delimiter)
 
