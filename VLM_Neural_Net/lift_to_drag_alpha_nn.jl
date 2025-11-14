@@ -151,8 +151,6 @@ function train()
         # Denormalize our values for CL and CD to provide true errors
         true_y2 = zeros(eltype(y),size(true_y))
         y2 = zeros(eltype(y),size(y))
-        print(size(y))
-        print(size(true_y))
         true_y2[1, :] .= true_y[1,:].*vlm_norm[1,2] .+vlm_norm[1,1] # predicted CL Values being denormalized
         true_y2[2, :] .= true_y[2,:].*vlm_norm[2,2] .+vlm_norm[2,1] # predicted CD Values being denormalized
         y2[1,:] .= y[1,:].*vlm_norm[1,2] .+vlm_norm[1,1] # Actual CL values being denormalized
